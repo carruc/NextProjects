@@ -28,7 +28,7 @@ export function RealTimeMonitor() {
     timeRange: '1h',
     selectedSensor: 'all',
     aggregationType: 'average' as AggregationType,
-    selectedTypes: ['temperature'] as SensorType[]
+    selectedTypes: [] as SensorType[]
   })
 
   // Fetch available devices on component mount
@@ -72,13 +72,19 @@ export function RealTimeMonitor() {
         <div className="relative h-full p-4">
           <h3 className="font-semibold mb-4">Sensor Data</h3>
           <div className="absolute inset-4 top-14">
-            <RealTimeLineChart
-              timeRange={displayOptions.timeRange}
-              selectedSensor={displayOptions.selectedSensor}
-              aggregationType={displayOptions.aggregationType}
-              selectedTypes={displayOptions.selectedTypes}
-              dataType={displayOptions.selectedTypes[0]}
-            />
+            {displayOptions.selectedTypes.length > 0 ? (
+              <RealTimeLineChart
+                timeRange={displayOptions.timeRange}
+                selectedSensor={displayOptions.selectedSensor}
+                aggregationType={displayOptions.aggregationType}
+                selectedTypes={displayOptions.selectedTypes}
+                dataType={displayOptions.selectedTypes[0]}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-gray-500">
+                No sensor selected
+              </div>
+            )}
           </div>
         </div>
       </Card>

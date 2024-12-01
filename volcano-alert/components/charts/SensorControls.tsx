@@ -30,7 +30,7 @@ export function SensorControls({ sensors, timeRanges, onOptionsChange }: SensorC
   const [selectedSensor, setSelectedSensor] = useState<string | 'all'>('all')
   const [timeRange, setTimeRange] = useState(timeRanges[0].value)
   const [aggregationType, setAggregationType] = useState<AggregationType>('average')
-  const [selectedTypes, setSelectedTypes] = useState<SensorType[]>(['temperature'])
+  const [selectedTypes, setSelectedTypes] = useState<SensorType[]>([])
 
   const handleChange = (changes: Partial<{
     timeRange: string
@@ -101,19 +101,15 @@ export function SensorControls({ sensors, timeRanges, onOptionsChange }: SensorC
         </select>
       </div>
 
-      {/* Updated Sensor Type Tags with prevention of deselecting last sensor */}
+      {/* Updated Sensor Type Tags */}
       <div className="flex flex-wrap gap-2">
         {SENSOR_TYPES.map((type) => {
           const isSelected = selectedTypes.includes(type.value)
-          const isOnlySelected = selectedTypes.length === 1 && isSelected
           
           return (
             <button
               key={type.value}
               onClick={() => {
-                // Prevent deselecting if it's the only selected sensor
-                if (isOnlySelected) return
-
                 const newTypes = selectedTypes.includes(type.value)
                   ? selectedTypes.filter(t => t !== type.value)
                   : [...selectedTypes, type.value]
@@ -124,7 +120,7 @@ export function SensorControls({ sensors, timeRanges, onOptionsChange }: SensorC
                 isSelected 
                   ? 'text-white shadow-md' 
                   : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-              } ${isOnlySelected ? 'cursor-not-allowed opacity-70' : ''}`}
+              }`}
               style={{
                 backgroundColor: isSelected ? type.color : undefined,
                 borderWidth: '1px',

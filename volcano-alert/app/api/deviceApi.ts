@@ -10,25 +10,6 @@ import {
 // Make sure this matches your Express server port
 const API_BASE_URL = 'http://localhost:8080/api';
 
-// Add this mock data near the top of the file
-const MOCK_DEVICES: DeviceStatus[] = [
-  {
-    deviceId: "device_1",
-    position: { latitude: 51.505, longitude: -0.09, altitude: 100 },
-    batteryLevel: 85
-  },
-  {
-    deviceId: "device_2",
-    position: { latitude: 51.51, longitude: -0.1, altitude: 120 },
-    batteryLevel: 72
-  },
-  {
-    deviceId: "device_3",
-    position: { latitude: 51.49, longitude: -0.08, altitude: 90 },
-    batteryLevel: 45
-  }
-];
-
 /**
  * Fetches the list of available device IDs from the server
  */
@@ -126,34 +107,25 @@ export async function getMultipleSensorData(
     }
 }
 
-/**
- * Fetches device locations from the server
- */
 export async function getDeviceLocations(): Promise<DeviceStatus[]> {
-    try {
-        // First get all available devices
-        const devices = await getAvailableDevices();
-        
-        // Then fetch location and battery data for each device
-        const deviceStatuses = await Promise.all(devices.map(async (deviceId) => {
-            // Get location data
-            const locationData = await getSensorData(deviceId, 'location');
-            const batteryData = await getSensorData(deviceId, 'battery');
-            
-            if (locationData.value && batteryData.value) {
-                return {
-                    deviceId: deviceId.toString(),
-                    position: locationData.value,
-                    batteryLevel: batteryData.value
-                };
-            }
-            return null;
-        }));
-
-        // Filter out null values and return valid device statuses
-        return deviceStatuses.filter((status): status is DeviceStatus => status !== null);
-    } catch (error) {
-        console.error('Failed to fetch device locations:', error);
-        return [];
-    }
+  try {
+    const deviceIds = await getAvailableDevices();
+    
+    const deviceLocations = await Promise.all(
+      deviceIds.map(async (deviceId) => {
+        const sensorData = await getMultipleSensorData(deviceId, ['location', 'battery']);
+        if (!sensorData.location) return null;
+        return {
+          deviceId: deviceId.toString(),
+          position: sensorData.location as unknown as GeoPosition,
+          batteryLevel: sensorData.battery ?? 0
+        } as DeviceStatus;
+      })
+    );
+    
+    return deviceLocations.filter((d): d is DeviceStatus => d !== null);
+  } catch (error) {
+    console.error('Failed to fetch device locations:', error);
+    return [];
+  }
 }

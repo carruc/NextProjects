@@ -8,9 +8,17 @@ export type SensorType =
   | 'pressure'
   | 'location'
   | 'co2'
-  | 'so2';
+  | 'so2'
+  | 'tagClass';
 
 export type AggregationType = 'average' | 'peak' | 'rms';
+
+export type HeatmapMetric = 
+  | 'temperature'
+  | 'co2'
+  | 'so2'
+  | 'vibration'
+  | 'pressure';
 
 export interface Sensor {
   id: string;
@@ -21,21 +29,14 @@ export interface SensorData {
   timestamp: Date;
   sensorId: string;
   type: SensorType;
-  value: number;  // Position uses quaternion, others use number
+  value: number;
 }
 
-// For sensor display/graph options
 export interface SensorDisplayOptions {
   timeRange: string;
   selectedSensor: string | 'all';
   aggregationType: AggregationType;
   selectedTypes: SensorType[];
-}
-
-// For sensor location data
-export interface SensorLocation {
-  deviceId: string;
-  timestamp: Date;
 }
 
 export interface GeoPosition {
@@ -44,8 +45,43 @@ export interface GeoPosition {
   altitude: number;
 }
 
+export interface SensorLocation {
+  deviceId: string;
+  timestamp: Date;
+  position: GeoPosition;
+}
+
+export interface SensorReading {
+  type: SensorType;
+  value: number;
+  timestamp: Date;
+}
+
 export interface DeviceStatus {
   deviceId: string;
-  position: GeoPosition;
+  position: {
+    latitude: number;
+    longitude: number;
+    altitude: number;
+  };
   batteryLevel: number;
+  temperature?: number;
+}
+
+export interface HeatmapPoint {
+  position: GeoPosition;
+  intensity: number;
+  metric: HeatmapMetric;
+}
+
+export interface HeatmapOptions {
+  metric: HeatmapMetric;
+  interpolationPoints?: number;
+  radius?: number;
+  opacity?: number;
+  colorScale?: {
+    min: string;
+    mid: string;
+    max: string;
+  };
 }

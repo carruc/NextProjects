@@ -11,33 +11,33 @@ UDP_PORT = 6000
 DEVICES = [
     {
         'id': 1,
-        'lat_range': (37.7510, 37.7515),  # North side
-        'long_range': (14.9932, 14.9936),
-        'alt_range': (2900, 3000)
+        'latitude': 37.7580,  # North (~1km from center)
+        'longitude': 14.9934,
+        'altitude': 2950
     },
     {
         'id': 2,
-        'lat_range': (37.7508, 37.7513),  # South side
-        'long_range': (14.9930, 14.9934),
-        'alt_range': (2800, 2900)
+        'latitude': 37.7440,  # South (~1.2km from center)
+        'longitude': 14.9934,
+        'altitude': 2850
     },
     {
         'id': 3,
-        'lat_range': (37.7511, 37.7516),  # East side
-        'long_range': (14.9935, 14.9939),
-        'alt_range': (2850, 2950)
+        'latitude': 37.7513,  # East (~1km from center)
+        'longitude': 15.0034,
+        'altitude': 2900
     },
     {
         'id': 4,
-        'lat_range': (37.7509, 37.7514),  # West side
-        'long_range': (14.9929, 14.9933),
-        'alt_range': (2750, 2850)
+        'latitude': 37.7513,  # West (~1km from center)
+        'longitude': 14.9834,
+        'altitude': 2800
     },
     {
         'id': 5,
-        'lat_range': (37.7512, 37.7517),  # Summit area
-        'long_range': (14.9933, 14.9937),
-        'alt_range': (3000, 3100)
+        'latitude': 37.7513,  # Center (summit area)
+        'longitude': 14.9934,
+        'altitude': 3050
     }
 ]
 
@@ -54,7 +54,7 @@ def create_test_packet(device_config):
     packet = struct.pack('<B', 77)                              # Packet length
     packet += struct.pack('<H', device_config['id'])            # Device ID
     packet += struct.pack('<B', 1)                             # Nicla type
-    packet += struct.pack('<B', 2)                             # Tag class
+    packet += struct.pack('<B', random.randint(0, 2))          # Tag class
     
     # Battery
     packet += struct.pack('<B', 0)            
@@ -84,15 +84,15 @@ def create_test_packet(device_config):
     packet += struct.pack('<B', 5)
     packet += struct.pack('<f', random.uniform(*PRESSURE_RANGE))
     
-    # Location data
+    # Location data (fixed coordinates)
     packet += struct.pack('<B', 6)
-    packet += struct.pack('<f', random.uniform(*device_config['lat_range']))    # Latitude
+    packet += struct.pack('<f', device_config['latitude'])     # Latitude
 
     packet += struct.pack('<B', 7)
-    packet += struct.pack('<f', random.uniform(*device_config['long_range']))   # Longitude
+    packet += struct.pack('<f', device_config['longitude'])    # Longitude
     
     packet += struct.pack('<B', 8)
-    packet += struct.pack('<f', random.uniform(*device_config['alt_range']))    # Altitude
+    packet += struct.pack('<f', device_config['altitude'])     # Altitude
     
     # Gas sensors
     packet += struct.pack('<B', 9)
@@ -109,7 +109,7 @@ def device_sender(device_config):
         packet = create_test_packet(device_config)
         sock.sendto(packet, (UDP_IP, UDP_PORT))
         print(f"Sent packet for Device {device_config['id']} to {UDP_IP}:{UDP_PORT}")
-        time.sleep(1)  # Send data every second
+        time.sleep(0.1)  # Changed from 1 to 0.1 seconds (10 packets per second)
 
 def main():
     # Create a thread for each device

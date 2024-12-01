@@ -27,7 +27,8 @@ const sensorData = {
     pressure: [],
     co2: [],
     so2: [],
-    location: []  // Will store lat, long, alt
+    location: [],
+    tagClass: []
 };
 
 // Type validation helpers
@@ -44,7 +45,8 @@ const validators = {
             'pressure',
             'co2',
             'so2',
-            'location'
+            'location',
+            'tagClass'
         ].includes(type);
     },
     isValidDate: (dateStr) => {
@@ -193,6 +195,13 @@ function storeData(readings) {
         const timestamp = readings.timestamp;
         const deviceId = readings.deviceId;
 
+        // Store tagClass
+        sensorData.tagClass.push({
+            timestamp,
+            deviceId,
+            value: readings.tagClass
+        });
+
         // Store acceleration components separately
         if (readings.sensors.acceleration) {
             const accel = readings.sensors.acceleration.value;
@@ -215,6 +224,11 @@ function storeData(readings) {
                 sensorData[type].shift();
             }
         });
+
+        // Make sure to trim tagClass array too
+        if (sensorData.tagClass.length > config.data.maxReadings) {
+            sensorData.tagClass.shift();
+        }
     } catch (error) {
         throw new Error(`Data storage error: ${error.message}`);
     }
@@ -237,7 +251,8 @@ udpServer.on('message', (msg, rinfo) => {
             pressure: readings.sensors.pressure.value.toFixed(2) + 'hPa',
             location: `lat:${readings.sensors.location.value.latitude.toFixed(6)}, long:${readings.sensors.location.value.longitude.toFixed(6)}, alt:${readings.sensors.location.value.altitude.toFixed(2)}m`,
             co2: readings.sensors.co2.value.toFixed(2) + 'ppm',
-            so2: readings.sensors.so2.value.toFixed(2) + 'ppb'
+            so2: readings.sensors.so2.value.toFixed(2) + 'ppb',
+            tagClass: readings.tagClass
         };
 
         console.log('Processed data from device', readings.deviceId, {
@@ -346,6 +361,115 @@ app.get('/api/devices', (req, res) => {
     });
     res.json(Array.from(devices));
 });
+
+// Message storage
+const automatedRules = new Map();
+
+// Messaging handlers
+const messageHandlers = {
+  async sendTelegram(message) {
+    console.log('[Telegram] Sending:', message);
+    // TODO: Implement actual Telegram integration
+  },
+  
+  async sendWhatsApp(message) {
+    console.log('[WhatsApp] Sending:', message);
+    // TODO: Implement actual WhatsApp integration
+  },
+  
+  async sendSMS(message) {
+    console.log('[SMS] Sending:', message);
+    // TODO: Implement actual SMS integration
+  }
+};
+
+// Broadcast message endpoint
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { message, channels, includeMetrics } = req.body;
+    
+    // Get current metrics if requested
+    let metricsText = '';
+    if (includeMetrics?.length > 0) {
+      const metricsData = {};
+      for (const metric of includeMetrics) {
+        if (metric in sensorData && sensorData[metric].length > 0) {
+          metricsData[metric] = sensorData[metric][sensorData[metric].length - 1].value;
+        }
+      }
+      metricsText = '\nCurrent Readings:\n' + 
+        Object.entries(metricsData)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+    }
+
+    const fullMessage = message + metricsText;
+    
+    // Send through each selected channel
+    const sendPromises = channels.map(channel => {
+      const handler = messageHandlers[`send${channel.charAt(0).toUpperCase() + channel.slice(1)}`];
+      return handler?.(fullMessage);
+    });
+
+    await Promise.all(sendPromises);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// Automated rules endpoints
+app.post('/api/automated-rules', (req, res) => {
+  try {
+    const rule = req.body;
+    automatedRules.set(rule.id, rule);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to add rule' });
+  }
+});
+
+app.delete('/api/automated-rules/:id', (req, res) => {
+  try {
+    automatedRules.delete(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete rule' });
+  }
+});
+
+// Check automated rules periodically
+setInterval(async () => {
+  for (const rule of automatedRules.values()) {
+    if (!rule.enabled) continue;
+
+    try {
+      const metricData = sensorData[rule.metricId];
+      if (!metricData?.length) continue;
+
+      const currentValue = metricData[metricData.length - 1].value;
+      const shouldAlert = rule.condition === 'higher' 
+        ? currentValue > rule.threshold
+        : currentValue < rule.threshold;
+
+      if (shouldAlert) {
+        const message = `ALERT: ${rule.metricId} is ${rule.condition} than ${rule.threshold} (Current: ${currentValue})${
+          rule.additionalText ? '\n' + rule.additionalText : ''
+        }`;
+
+        const sendPromises = rule.channels.map(channel => {
+          const handler = messageHandlers[`send${channel.charAt(0).toUpperCase() + channel.slice(1)}`];
+          return handler?.(message);
+        });
+
+        await Promise.all(sendPromises);
+      }
+    } catch (error) {
+      console.error(`Error checking rule ${rule.id}:`, error);
+    }
+  }
+}, 60000); // Check every minute
 
 // Start servers
 udpServer.bind(config.server.udpPort, '0.0.0.0');

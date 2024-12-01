@@ -88,3 +88,53 @@ body {
   justify-content: center;
 }
 
+/* Add these styles for the Genially embed */
+.container-wrapper-genially {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background-color: #f8fafc;
+}
+
+.genially-embed {
+  transition: opacity 0.3s ease;
+}
+
+.genially-embed:not(:empty) + .absolute {
+  display: none;
+}
+
+/* Add this to your globals.css */
+.gradient-text {
+  color: black;
+  animation: shadow-shift 8s ease infinite;
+}
+
+@keyframes shadow-shift {
+  0% {
+    text-shadow: 
+      0 0 8px rgba(255, 215, 0, 0.3),
+      0 0 15px rgba(255, 215, 0, 0.2);
+  }
+  25% {
+    text-shadow: 
+      0 0 8px rgba(255, 77, 77, 0.3),
+      0 0 15px rgba(255, 77, 77, 0.2);
+  }
+  50% {
+    text-shadow: 
+      0 0 8px rgba(255, 20, 147, 0.3),
+      0 0 15px rgba(255, 20, 147, 0.2);
+  }
+  75% {
+    text-shadow: 
+      0 0 8px rgba(148, 0, 211, 0.3),
+      0 0 15px rgba(148, 0, 211, 0.2);
+  }
+  100% {
+    text-shadow: 
+      0 0 8px rgba(255, 215, 0, 0.3),
+      0 0 15px rgba(255, 215, 0, 0.2);
+  }
+}
+

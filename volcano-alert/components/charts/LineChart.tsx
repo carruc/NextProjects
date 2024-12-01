@@ -63,9 +63,9 @@ export function LineChart({ dataType, timeRange }: LineChartProps) {
       x: {
         type: 'time' as const,
         time: {
-          unit: timeRange === '1h' ? 'minute' : 
-                timeRange === '24h' ? 'hour' : 
-                timeRange === '7d' ? 'day' : 'week'
+          unit: (timeRange === '1h' ? 'minute' : 
+                 timeRange === '24h' ? 'hour' : 
+                 timeRange === '7d' ? 'day' : 'week') as 'minute' | 'hour' | 'day' | 'week'
         },
         title: {
           display: true,

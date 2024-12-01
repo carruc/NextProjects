@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import { ArrowUpIcon, ArrowDownIcon, ArrowRightIcon } from "lucide-react";
 import { RiskHistoryGraph } from './RiskHistoryGraph';
 import { format } from 'date-fns';
+import { getMultipleSensorData } from '@/app/api/deviceApi';
 
 const getStatusInfo = (dangerLevel: number) => {
   if (dangerLevel <= 25) {
@@ -75,8 +76,8 @@ export function DangerGauge({
 
   return (
     <div className="flex flex-col items-stretch p-6 rounded-lg shadow-sm bg-slate-50">
-      <h2 className="text-xl font-bold mb-4 text-center">Current Risk Level</h2>
-      <div className="relative w-full aspect-square max-w-[14rem] mx-auto">
+      <h2 className="text-xl font-bold mb-4 text-center">AI-detected Risk Level</h2>
+      <div className="relative w-full aspect-square max-w-[14rem] mx-auto drop-shadow-sm">
         <CircularProgressbar
           value={risk}
           text=""
@@ -89,20 +90,16 @@ export function DangerGauge({
           })}
         />
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-lg font-semibold" style={{ color: statusInfo.color }}>
+          <span className="text-lg font-semibold drop-shadow-sm" style={{ color: statusInfo.color }}>
             {statusInfo.text}
           </span>
-          <span className="text-3xl font-bold mt-1" style={{ color: statusInfo.color }}>
+          <span className="text-3xl font-bold mt-1 drop-shadow-sm" style={{ color: statusInfo.color }}>
             {Math.round(risk)}%
           </span>
         </div>
       </div>
       
       <div className="w-full mt-6 space-y-4">
-        <div className="text-sm text-gray-500 text-center">
-          Confidence: {(confidence * 100).toFixed(1)}%
-        </div>
-        
         <div className="border-t pt-4">
           <h3 className="text-sm font-medium mb-2 text-gray-600">Risk History</h3>
           <div className="h-32">

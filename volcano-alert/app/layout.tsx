@@ -1,12 +1,33 @@
 import { Inter } from "next/font/google"
 import "./globals.css"
 import SidebarNew from "@/components/SidebarNew"
+import { AlertDashboard } from '@/components/AlertDashboard'
+import { DeviceList } from '@/components/DeviceList'
+import { Map } from '@/components/Map'
 
 const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
 })
+
+const VIEWS = {
+  dashboard: {
+    name: 'Dashboard',
+    icon: 'LayoutDashboard',
+    component: AlertDashboard
+  },
+  map: {
+    name: 'Map View',
+    icon: 'Map',
+    component: Map
+  },
+  devices: {
+    name: 'Devices',
+    icon: 'Cpu',
+    component: DeviceList
+  }
+}
 
 export default function RootLayout({
   children,

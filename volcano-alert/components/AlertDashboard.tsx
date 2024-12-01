@@ -1,4 +1,6 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+'use client'
+
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Alert, AlertSeverity } from "@/types/alert";
 import { AlertCard } from "./AlertCard";
 import { DangerGauge } from "./DangerGauge";
@@ -19,6 +21,7 @@ import {
   DEFAULT_WEIGHTS,
   THRESHOLDS
 } from "@/utils/riskCalculations";
+import { getLatestCollectiveData } from '@/app/api/deviceApi';
 
 interface AlertDashboardProps {
   alerts: Alert[];
@@ -34,6 +37,49 @@ export function AlertDashboard({
   const [selectedSeverity, setSelectedSeverity] = useState<AlertSeverity | 'all'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const previousAlerts = useRef<Alert[]>([]);
+  const [tagClassRisk, setTagClassRisk] = useState<number>(0);
+  const [localRiskHistory, setLocalRiskHistory] = useState<Array<{
+    timestamp: Date;
+    risk: number;
+    confidence: number;
+  }>>([]);
+
+  // Add useEffect to fetch tagClass data and update history
+  useEffect(() => {
+    const fetchTagClassRisk = async () => {
+      try {
+        const data = await getLatestCollectiveData(['tagClass'], 'average');
+        const newRisk = Math.min(100, (data.tagClass?.metrics.average ?? 0) * 50);
+        setTagClassRisk(newRisk);
+        
+        // Update history
+        setLocalRiskHistory(prev => {
+          const newHistory = [
+            ...prev,
+            {
+              timestamp: new Date(),
+              risk: newRisk,
+              confidence: 1
+            }
+          ].slice(-10); // Keep only last 10 entries
+          return newHistory;
+        });
+      } catch (error) {
+        console.error('Error fetching tagClass:', error);
+      }
+    };
+
+    fetchTagClassRisk();
+    const interval = setInterval(fetchTagClassRisk, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Create riskData object using tagClass average
+  const riskData = {
+    risk: tagClassRisk,
+    confidence: 1,
+    factors: {}
+  };
 
   // Filter alerts based on selected severity
   const filteredAlerts = useMemo(() => 
@@ -65,49 +111,6 @@ export function AlertDashboard({
     );
     return previousAlert?.value;
   };
-
-  // Calculate risk data using the risk calculations module
-  const riskData: RiskData = useMemo(() => {
-    // Calculate normalized values for each factor
-    const normalizedSO2 = calculateNormalizedValue(sensorLevels.so2, THRESHOLDS.so2);
-    const normalizedCO2 = calculateNormalizedValue(sensorLevels.co2, THRESHOLDS.co2);
-    const normalizedSeismic = calculateNormalizedValue(sensorLevels.seismic, THRESHOLDS.seismic);
-
-    // Calculate weighted risk score
-    const riskScore = (
-      normalizedSO2 * DEFAULT_WEIGHTS.so2 +
-      normalizedCO2 * DEFAULT_WEIGHTS.co2 +
-      normalizedSeismic * DEFAULT_WEIGHTS.seismic
-    ) * 100;
-
-    // Get previous values from history if available
-    const previousReadings = riskHistory[riskHistory.length - 2] || null;
-
-    return {
-      risk: Math.min(100, Math.max(0, riskScore)),
-      confidence: 0.85, // Could be calculated based on sensor reliability and data quality
-      factors: {
-        so2: {
-          value: sensorLevels.so2,
-          trend: previousReadings ? calculateTrend(sensorLevels.so2, previousReadings.risk) : 'stable',
-          weight: DEFAULT_WEIGHTS.so2,
-          threshold: THRESHOLDS.so2
-        },
-        co2: {
-          value: sensorLevels.co2,
-          trend: previousReadings ? calculateTrend(sensorLevels.co2, previousReadings.risk) : 'stable',
-          weight: DEFAULT_WEIGHTS.co2,
-          threshold: THRESHOLDS.co2
-        },
-        seismic: {
-          value: sensorLevels.seismic,
-          trend: previousReadings ? calculateTrend(sensorLevels.seismic, previousReadings.risk) : 'stable',
-          weight: DEFAULT_WEIGHTS.seismic,
-          threshold: THRESHOLDS.seismic
-        }
-      }
-    };
-  }, [sensorLevels, riskHistory]);
 
   // Determine if an alert is contributing to high risk
   const isRiskContributor = useCallback((alert: Alert) => {
@@ -156,10 +159,7 @@ export function AlertDashboard({
         <div className="lg:col-span-1">
           <DangerGauge 
             riskData={riskData}
-            riskHistory={riskHistory.map(item => ({
-              ...item,
-              confidence: item.confidence ?? 0.8
-            }))}
+            riskHistory={localRiskHistory}
             lastUpdated={new Date()}
           />
         </div>
