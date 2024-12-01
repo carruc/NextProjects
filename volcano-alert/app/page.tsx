@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react'
 import Script from 'next/script'
 import Image from 'next/image'
+import { FeatureCard } from '@/components/FeatureCard'
 
 export default function LandingPage() {
   useEffect(() => {
@@ -26,71 +27,68 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
-        <div className="max-w-3xl mx-auto text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-            <span className="gradient-text">VulcaNicla</span>
-            <span>: Next-Gen Volcanic Monitoring</span>
-          </h1>
-          
-          <p className="text-xl text-gray-600 mb-12">
-            Revolutionizing volcanic monitoring with edge-AI powered sensors and real-time alerts. 
+        <div className="mx-auto mb-16">
+          <div className="flex flex-col gap-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 text-left">
+              <span className="gradient-text">VulcaNicla</span>
+              <span>: Next-Gen Volcanic Monitoring</span>
+            </h1>
+            
+            <p className="text-2xl font-light text-gray-800 tracking-wide text-left">
+              Protecting communities through accessible, innovative technology.
+            </p>
+          </div>
+
+          <p className="text-xl text-gray-900 mb-12 text-left mt-8">
+            We aim at revolutionizing volcanic monitoring with edge-AI powered sensors and real-time alerts. 
             Our affordable, all-in-one solution provides crucial early warning capabilities at a 
             fraction of traditional costs.
           </p>
 
-          <div className="text-left bg-gray-50 p-8 rounded-lg shadow-sm">
-            <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              Why Choose Volcano Alert?
+          {/* Features Section - Replaced the bg-gray-50 div */}
+          <div className="mt-16">
+            <h3 className="text-2xl font-semibold text-gray-800 mb-10 text-center">
+              Why choose VulcaNicla?
             </h3>
             
-            <ul className="space-y-4">
-              <li className="flex items-start">
-                <span className="font-semibold text-gray-900 mr-2">•</span>
-                <span>
-                  <strong className="text-gray-900">Real-Time Monitoring:</strong>
-                  {' '}Instant detection of volcanic activity
-                </span>
-              </li>
-              <li className="flex items-start">
-                <span className="font-semibold text-gray-900 mr-2">•</span>
-                <span>
-                  <strong className="text-gray-900">Comprehensive Data:</strong>
-                  {' '}Temperature, seismic, gas, and ground deformation monitoring
-                </span>
-              </li>
-              <li className="flex items-start">
-                <span className="font-semibold text-gray-900 mr-2">•</span>
-                <span>
-                  <strong className="text-gray-900">AI-Powered Analysis:</strong>
-                  {' '}Advanced prediction and early warning system
-                </span>
-              </li>
-              <li className="flex items-start">
-                <span className="font-semibold text-gray-900 mr-2">•</span>
-                <span>
-                  <strong className="text-gray-900">Cost-Effective:</strong>
-                  {' '}90% cheaper than traditional solutions*
-                </span>
-              </li>
-              <li className="flex items-start">
-                <span className="font-semibold text-gray-900 mr-2">•</span>
-                <span>
-                  <strong className="text-gray-900">Easy Deployment:</strong>
-                  {' '}Quick setup in remote locations
-                </span>
-              </li>
-            </ul>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              <FeatureCard 
+                title="Real-Time Monitoring"
+                description="Instant detection of volcanic activity"
+              />
+              <FeatureCard 
+                title="Comprehensive Data"
+                description="Temperature, seismic, gas, and ground deformation monitoring"
+              />
+              <FeatureCard 
+                title="AI-Powered Analysis"
+                description="Advanced prediction and early warning system"
+              />
+              <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[66%] mx-auto">
+                <FeatureCard 
+                  title="Cost-Effective"
+                  description="90% cheaper than traditional solutions*"
+                />
+                <FeatureCard 
+                  title="Easy Deployment"
+                  description="Quick setup in remote locations"
+                />
+              </div>
+            </div>
           </div>
+        </div>
 
-          <p className="text-lg text-gray-700 mt-8 font-medium">
-            Protecting communities through accessible, innovative technology.
+        {/* Mission introduction */}
+        <div className="text-center my-24">
+          <p className="text-2xl font-light text-gray-800">
+            Let us introduce our mission:
           </p>
         </div>
 
         {/* Genially Container */}
         <div 
-          className="container-wrapper-genially relative min-h-[800px] w-full max-w-[1200px] mx-auto mt-8"
-          style={{ aspectRatio: '16/9' }}
+          className="container-wrapper-genially relative w-full mx-auto mt-8"
+          style={{ minHeight: '80vh' }}
         >
           {/* Loading Animation */}
           <div className="absolute inset-0 flex items-center justify-center">

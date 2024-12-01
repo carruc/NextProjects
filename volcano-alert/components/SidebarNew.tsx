@@ -16,10 +16,10 @@ import {
 const navigation = [
   { name: 'Real-time Data', href: '/real-time', icon: ActivitySquare },
   { name: 'Geographic View', href: '/geographic', icon: MapPin },
-  { name: 'Predictions', href: '/predictions', icon: LineChart },
   { name: 'Alerts', href: '/alerts', icon: Bell },
   { name: 'Broadcast', href: '/broadcast', icon: Megaphone },
   { name: 'Devices', href: '/devices', icon: Cpu },
+  { name: 'Predictions', href: '/predictions', icon: LineChart }, // Moved to end
 ]
 
 export default function SidebarNew() {

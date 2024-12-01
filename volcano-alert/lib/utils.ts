@@ -5,12 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function accelerationToMercalli(acceleration: number): {
+export function accelerationToRichter(acceleration: number): {
   intensity: number;
   description: string;
 } {
+  acceleration = (acceleration/50);
   // Acceleration should be in g units
-  acceleration = (acceleration - 9.81);
   if (acceleration < 0.0017) {
     return { intensity: 1, description: 'Not felt' };
   } else if (acceleration < 0.014) {

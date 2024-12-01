@@ -6,7 +6,7 @@ import { Alert, AlertType } from "@/types/alert";
 import { calculateSeverity } from "@/utils/alertThresholds";
 import { getLatestCollectiveData } from "@/app/api/deviceApi";
 import { SensorType } from "@/types/sensors";
-import { accelerationToMercalli } from "@/lib/utils";
+import { accelerationToRichter } from "@/lib/utils";
 
 async function fetchSensorData() {
   try {
@@ -45,7 +45,7 @@ function processRawData(data: any): Alert[] {
 
   // Process seismic data
   if (data.averageSeismic !== null) {
-    const mercalli = accelerationToMercalli(data.averageSeismic);
+    const mercalli = accelerationToRichter(data.averageSeismic);
     alerts.push({
       type: 'seismic',
       value: mercalli.intensity,

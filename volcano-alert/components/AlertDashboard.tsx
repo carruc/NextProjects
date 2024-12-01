@@ -70,7 +70,7 @@ export function AlertDashboard({
     };
 
     fetchTagClassRisk();
-    const interval = setInterval(fetchTagClassRisk, 30000);
+    const interval = setInterval(fetchTagClassRisk, 1000);
     return () => clearInterval(interval);
   }, []);
 
