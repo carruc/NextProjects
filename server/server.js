@@ -3,27 +3,49 @@ const dgram = require('dgram');
 const cors = require('cors');
 const config = require('./config');
 
+// Create servers
 const app = express();
 const udpServer = dgram.createSocket('udp4');
 
 // Enable CORS and JSON parsing
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000', // Your Next.js frontend URL
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 
-// Data structure for basic NICLA sensor data
+// Data structure for sensor data
 const sensorData = {
-    battery: [],    // SENS_ID: config.sensorIds.BATTERY
-    position: [],   // SENS_ID: config.sensorIds.POSITION
-    acceleration: [],// SENS_ID: config.sensorIds.ACCELERATION
-    vibration: [],  // SENS_ID: config.sensorIds.VIBRATION
-    temperature: [], // SENS_ID: config.sensorIds.TEMPERATURE
-    pressure: []    // SENS_ID: config.sensorIds.PRESSURE
+    battery: [],
+    position: [],
+    acceleration_x: [],
+    acceleration_y: [],
+    acceleration_z: [],
+    vibration: [],
+    temperature: [],
+    pressure: [],
+    co2: [],
+    so2: [],
+    location: []  // Will store lat, long, alt
 };
 
 // Type validation helpers
 const validators = {
     isValidSensorType: (type) => {
-        return ['battery', 'position', 'acceleration', 'vibration', 'temperature', 'pressure'].includes(type);
+        return [
+            'battery', 
+            'position', 
+            'acceleration_x',
+            'acceleration_y',
+            'acceleration_z',
+            'vibration', 
+            'temperature', 
+            'pressure',
+            'co2',
+            'so2',
+            'location'
+        ].includes(type);
     },
     isValidDate: (dateStr) => {
         const date = new Date(dateStr);
@@ -35,42 +57,54 @@ const validators = {
     }
 };
 
-/*
-Packet Structure (46 bytes total):
-HEADER:
-- Length:     1B  (UInt8)    // Total packet length
-- Device ID:  2B  (UInt16)   // Unique device identifier
-- NiclaType:  1B  (UInt8)    // Type of Nicla board
-- TagClass:   1B  (UInt8)    // Classification tag
+// Statistical helper functions
+const statisticalHelpers = {
+    calculateAverage: (values) => {
+        if (!values.length) return null;
+        return values.reduce((sum, val) => sum + val, 0) / values.length;
+    },
+    calculatePeak: (values) => {
+        if (!values.length) return null;
+        return Math.max(...values);
+    },
+    calculateRMS: (values) => {
+        if (!values.length) return null;
+        const squares = values.map(val => val * val);
+        const mean = squares.reduce((sum, val) => sum + val, 0) / values.length;
+        return Math.sqrt(mean);
+    },
+    extractValues: (readings) => {
+        return readings.map(reading => reading.value);
+    }
+};
 
-SENSOR DATA (each starts with 1B Sensor ID):
-- Battery:     1B  (UInt8)    // 0-100%
-- Position:    16B (4×Float)  // x,y,z,w quaternion
-- Acceleration: 6B (3×Int16)  // x,y,z in mg (millig)
-- Vibration:   4B  (Float)    // Vibration magnitude
-- Temperature: 4B  (Float)    // Degrees Celsius
-- Pressure:    4B  (Float)    // hPa (hectopascal)
-*/
+const ProcessingTypes = {
+    AVERAGE: 'average',
+    PEAK: 'peak',
+    RMS: 'rms',
+    ALL: 'all'
+};
+
 function parsePacket(buffer) {
     try {
         if (!Buffer.isBuffer(buffer)) {
             throw new Error('Invalid input: expected Buffer');
         }
 
-        if (buffer.length < 46) {
+        if (buffer.length < 77) {
             throw new Error(`Invalid packet length: ${buffer.length} bytes`);
         }
 
         let offset = 0;
         
-        // Parse header with validation
+        // Parse header
         const length = buffer.readUInt8(offset); offset += 1;
         if (length !== buffer.length) {
             throw new Error(`Length mismatch: expected ${length}, got ${buffer.length}`);
         }
 
-        const deviceId = buffer.readUInt16BE(offset); offset += 2;
-        if (deviceId <= 0) {
+        const deviceId = buffer.readUInt16LE(offset); offset += 2;
+        if (deviceId < 0) {
             throw new Error(`Invalid device ID: ${deviceId}`);
         }
 
@@ -86,36 +120,67 @@ function parsePacket(buffer) {
             sensors: {}
         };
 
+        // Read battery
         const batteryId = buffer.readUInt8(offset); offset += 1;
         const battery = buffer.readUInt8(offset); offset += 1;
-        readings.sensors[batteryId] = { type: 'battery', value: battery };
+        readings.sensors.battery = { type: 'battery', value: battery };
 
+        // Read position
         const positionId = buffer.readUInt8(offset); offset += 1;
-        const x = buffer.readFloatBE(offset); offset += 4;
-        const y = buffer.readFloatBE(offset); offset += 4;
-        const z = buffer.readFloatBE(offset); offset += 4;
-        const w = buffer.readFloatBE(offset); offset += 4;
-        const position = { x, y, z, w };
-        readings.sensors[positionId] = { type: 'position', value: position };
+        const px = buffer.readFloatLE(offset); offset += 4;
+        const py = buffer.readFloatLE(offset); offset += 4;
+        const pz = buffer.readFloatLE(offset); offset += 4;
+        const pw = buffer.readFloatLE(offset); offset += 4;
+        readings.sensors.position = { 
+            type: 'position', 
+            value: { x: px, y: py, z: pz, w: pw } 
+        };
 
+        // Read acceleration
         const accelId = buffer.readUInt8(offset); offset += 1;
-        const ax = buffer.readInt16BE(offset); offset += 2;
-        const ay = buffer.readInt16BE(offset); offset += 2;
-        const az = buffer.readInt16BE(offset); offset += 2;
-        const acceleration = { x: ax, y: ay, z: az };
-        readings.sensors[accelId] = { type: 'acceleration', value: acceleration };
+        const ax = buffer.readFloatLE(offset); offset += 4;
+        const ay = buffer.readFloatLE(offset); offset += 4;
+        const az = buffer.readFloatLE(offset); offset += 4;
+        readings.sensors.acceleration = {
+            type: 'acceleration',
+            value: { x: ax, y: ay, z: az }
+        };
 
+        // Read other sensors
         const vibrationId = buffer.readUInt8(offset); offset += 1;
-        const vibration = buffer.readFloatBE(offset); offset += 4;
-        readings.sensors[vibrationId] = { type: 'vibration', value: vibration };
+        const vibration = buffer.readFloatLE(offset); offset += 4;
+        readings.sensors.vibration = { type: 'vibration', value: vibration };
 
         const temperatureId = buffer.readUInt8(offset); offset += 1;
-        const temperature = buffer.readFloatBE(offset); offset += 4;
-        readings.sensors[temperatureId] = { type: 'temperature', value: temperature };
+        const temperature = buffer.readFloatLE(offset); offset += 4;
+        readings.sensors.temperature = { type: 'temperature', value: temperature };
 
         const pressureId = buffer.readUInt8(offset); offset += 1;
-        const pressure = buffer.readFloatBE(offset); offset += 4;
-        readings.sensors[pressureId] = { type: 'pressure', value: pressure };
+        const pressure = buffer.readFloatLE(offset); offset += 4;
+        readings.sensors.pressure = { type: 'pressure', value: pressure };
+
+         // Add parsing for new sensors
+         const latitudeId = buffer.readUInt8(offset); offset += 1;
+         const latitude = buffer.readFloatLE(offset); offset += 4;
+
+         const longitudeId = buffer.readUInt8(offset); offset += 1;
+         const longitude = buffer.readFloatLE(offset); offset += 4;
+         
+         const altitudeId = buffer.readUInt8(offset); offset += 1;
+         const altitude = buffer.readFloatLE(offset); offset += 4;
+ 
+         const co2Id = buffer.readUInt8(offset); offset += 1;
+         const co2 = buffer.readFloatLE(offset); offset += 4;
+ 
+         const so2Id = buffer.readUInt8(offset); offset += 1;
+         const so2 = buffer.readFloatLE(offset); offset += 4;
+
+        readings.sensors.location = {
+            type: 'location',
+            value: { latitude, longitude, altitude }
+        };
+        readings.sensors.co2 = { type: 'co2', value: co2 };
+        readings.sensors.so2 = { type: 'so2', value: so2 };
 
         return readings;
     } catch (error) {
@@ -123,32 +188,31 @@ function parsePacket(buffer) {
     }
 }
 
-// Store data in appropriate arrays
 function storeData(readings) {
     try {
-        if (!readings || typeof readings !== 'object') {
-            throw new Error('Invalid readings object');
+        const timestamp = readings.timestamp;
+        const deviceId = readings.deviceId;
+
+        // Store acceleration components separately
+        if (readings.sensors.acceleration) {
+            const accel = readings.sensors.acceleration.value;
+            sensorData.acceleration_x.push({ timestamp, deviceId, value: accel.x });
+            sensorData.acceleration_y.push({ timestamp, deviceId, value: accel.y });
+            sensorData.acceleration_z.push({ timestamp, deviceId, value: accel.z });
         }
 
-        if (!readings.sensors || typeof readings.sensors !== 'object') {
-            throw new Error('Invalid sensors data');
-        }
-
-        Object.entries(readings.sensors).forEach(([sensorId, data]) => {
-            if (!validators.isValidSensorType(data.type)) {
-                throw new Error(`Invalid sensor type: ${data.type}`);
+        // Store other sensor data
+        Object.entries(readings.sensors).forEach(([type, data]) => {
+            if (type !== 'acceleration' && type in sensorData) {
+                const reading = { timestamp, deviceId, value: data.value };
+                sensorData[type].push(reading);
             }
+        });
 
-            const reading = {
-                timestamp: readings.timestamp,
-                deviceId: readings.deviceId,
-                value: data.value
-            };
-
-            sensorData[data.type].push(reading);
-
-            if (sensorData[data.type].length > config.data.maxReadings) {
-                sensorData[data.type].shift();
+        // Trim arrays if they exceed max readings
+        Object.keys(sensorData).forEach(type => {
+            if (sensorData[type].length > config.data.maxReadings) {
+                sensorData[type].shift();
             }
         });
     } catch (error) {
@@ -156,123 +220,125 @@ function storeData(readings) {
     }
 }
 
-// UDP Server setup
+
+// UDP Server message handler
 udpServer.on('message', (msg, rinfo) => {
     try {
-        console.log(`Received packet from ${rinfo.address}:${rinfo.port} (${msg.length} bytes)`);
         const readings = parsePacket(msg);
         storeData(readings);
         
-        // Create structured sensor readings log
-        const sensorReadings = Object.entries(readings.sensors).map(([id, data]) => ({
-            sensorId: id,
-            type: data.type,
-            value: typeof data.value === 'object' ? 
-                JSON.stringify(data.value) : 
-                data.value
-        }));
+        // Create a formatted data summary
+        const dataSummary = {
+            battery: readings.sensors.battery.value + '%',
+            position: readings.sensors.position.value,
+            acceleration: `x:${readings.sensors.acceleration.value.x.toFixed(3)}g, y:${readings.sensors.acceleration.value.y.toFixed(3)}g, z:${readings.sensors.acceleration.value.z.toFixed(3)}g`,
+            vibration: readings.sensors.vibration.value.toFixed(3),
+            temperature: readings.sensors.temperature.value.toFixed(2) + '°C',
+            pressure: readings.sensors.pressure.value.toFixed(2) + 'hPa',
+            location: `lat:${readings.sensors.location.value.latitude.toFixed(6)}, long:${readings.sensors.location.value.longitude.toFixed(6)}, alt:${readings.sensors.location.value.altitude.toFixed(2)}m`,
+            co2: readings.sensors.co2.value.toFixed(2) + 'ppm',
+            so2: readings.sensors.so2.value.toFixed(2) + 'ppb'
+        };
 
-        console.log('Successfully processed data:', {
-            deviceId: readings.deviceId,
+        console.log('Processed data from device', readings.deviceId, {
             timestamp: readings.timestamp,
             niclaType: readings.niclaType,
             tagClass: readings.tagClass,
-            sensors: sensorReadings
+            readings: dataSummary
         });
     } catch (error) {
-        console.error('Error processing UDP message:', {
-            error: error.message,
-            sender: `${rinfo.address}:${rinfo.port}`,
-            rawData: msg.toString('hex')
-        });
+        console.error('Error processing UDP message:', error);
     }
 });
 
 // API Endpoints
 
-// Data for a specific sensor type
-app.get('/api/data/:sensorType', (req, res) => {
+// Get latest readings for specific sensor and device
+app.get('/api/sensors/:deviceId', (req, res) => {
     try {
-        const { sensorType } = req.params;
-        const { startTime, endTime, deviceId } = req.query;
+        const { deviceId } = req.params;
+        const { type } = req.query;
 
-        // Validate sensor type
-        if (!validators.isValidSensorType(sensorType)) {
-            return res.status(400).json({ 
+        if (!type || !validators.isValidSensorType(type)) {
+            return res.status(400).json({
                 error: 'Invalid sensor type',
-                message: `Supported types: battery, position, acceleration, vibration, temperature, pressure`
+                message: `Supported types: ${Object.keys(sensorData).join(', ')}`
             });
         }
 
-        let data = sensorData[sensorType] || [];
+        const data = sensorData[type];
+        let reading = null;
 
-        // Validate and apply time range filter
-        if (startTime || endTime) {
-            if (!validators.isValidDate(startTime) || !validators.isValidDate(endTime)) {
-                return res.status(400).json({ 
-                    error: 'Invalid date format',
-                    message: 'Please provide dates in ISO format (YYYY-MM-DDTHH:mm:ss.sssZ)'
-                });
-            }
-
-            data = data.filter(reading => 
-                reading.timestamp >= startTime && 
-                reading.timestamp <= endTime
-            );
+        if (deviceId === 'all') {
+            reading = data[data.length - 1];
+        } else {
+            reading = [...data]
+                .reverse()
+                .find(r => r.deviceId.toString() === deviceId);
         }
 
-        // Validate and apply device ID filter
-        if (deviceId) {
-            if (!validators.isValidDeviceId(deviceId)) {
-                return res.status(400).json({ 
-                    error: 'Invalid device ID',
-                    message: 'Device ID must be a positive integer'
-                });
-            }
-
-            data = data.filter(reading => 
-                reading.deviceId === parseInt(deviceId)
-            );
-        }
-
-        res.json(data);
+        res.json({ value: reading?.value ?? null });
     } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: error.message
         });
     }
 });
 
-// Latest reading for each sensor type
-app.get('/api/latest', (req, res) => {
+// Get collective statistics for multiple sensor types
+app.get('/api/collective/multi', (req, res) => {
     try {
-        const { deviceId } = req.query;
-        const latest = {};
+        const { sensorTypes, processing = ProcessingTypes.ALL } = req.query;
         
-        Object.entries(sensorData).forEach(([type, data]) => {
-            if (deviceId) {
-                // Filter for specific device
-                const deviceData = data.filter(reading => 
-                    reading.deviceId === parseInt(deviceId)
-                );
-                latest[type] = deviceData[deviceData.length - 1] || null;
-            } else {
-                // Get latest reading regardless of device
-                latest[type] = data[data.length - 1] || null;
+        if (!sensorTypes) {
+            return res.status(400).json({
+                error: 'Missing sensor types',
+                message: 'Please provide comma-separated sensor types'
+            });
+        }
+
+        const types = sensorTypes.split(',');
+        const results = {};
+
+        types.forEach(sensorType => {
+            if (!validators.isValidSensorType(sensorType)) {
+                return;
+            }
+
+            // Get recent readings for calculations
+            let data = sensorData[sensorType]?.slice(-100) || [];
+            const values = statisticalHelpers.extractValues(data);
+
+            results[sensorType] = {
+                timestamp: new Date().toISOString(),
+                metrics: {},
+                deviceCount: new Set(data.map(reading => reading.deviceId)).size,
+                readingCount: data.length
+            };
+
+            // Calculate requested metrics
+            if (processing === ProcessingTypes.ALL || processing === ProcessingTypes.AVERAGE) {
+                results[sensorType].metrics.average = statisticalHelpers.calculateAverage(values);
+            }
+            if (processing === ProcessingTypes.ALL || processing === ProcessingTypes.PEAK) {
+                results[sensorType].metrics.peak = statisticalHelpers.calculatePeak(values);
+            }
+            if (processing === ProcessingTypes.ALL || processing === ProcessingTypes.RMS) {
+                results[sensorType].metrics.rms = statisticalHelpers.calculateRMS(values);
             }
         });
-        
-        res.json(latest);
+
+        res.json(results);
     } catch (error) {
-        res.status(500).json({ 
+        res.status(500).json({
             error: 'Internal server error',
             message: error.message
         });
     }
 });
 
-// Get available device IDs
+// Get available devices
 app.get('/api/devices', (req, res) => {
     const devices = new Set();
     Object.values(sensorData).forEach(dataArray => {
@@ -281,76 +347,14 @@ app.get('/api/devices', (req, res) => {
     res.json(Array.from(devices));
 });
 
-// Historical data with limit
-app.get('/api/data/:sensorType/history', (req, res) => {
-    try {
-        const { sensorType } = req.params;
-        const { limit, deviceId } = req.query;
-        
-        // Validate sensor type
-        if (!validators.isValidSensorType(sensorType)) {
-            return res.status(400).json({ 
-                error: 'Invalid sensor type',
-                message: `Supported types: battery, position, acceleration, vibration, temperature, pressure`
-            });
-        }
-
-        let data = sensorData[sensorType] || [];
-        
-        // Apply device ID filter if provided
-        if (deviceId) {
-            if (!validators.isValidDeviceId(deviceId)) {
-                return res.status(400).json({ 
-                    error: 'Invalid device ID',
-                    message: 'Device ID must be a positive integer'
-                });
-            }
-            data = data.filter(reading => 
-                reading.deviceId === parseInt(deviceId)
-            );
-        }
-
-        // Apply limit and return most recent data first
-        const limitNum = parseInt(limit) || 100; // Default to 100 if not specified
-        data = data.slice(-limitNum).reverse();
-
-        res.json(data);
-    } catch (error) {
-        res.status(500).json({ 
-            error: 'Internal server error',
-            message: error.message
-        });
-    }
-});
-
-// Start servers using config
-udpServer.bind(config.server.udpPort);
+// Start servers
+udpServer.bind(config.server.udpPort, '0.0.0.0');
 app.listen(config.server.httpPort, () => {
     console.log(`HTTP Server running on port ${config.server.httpPort}`);
     console.log(`UDP Server listening on port ${config.server.udpPort}`);
 });
 
-// Debugging endpoint
-app.get('/api/debug/latest', (req, res) => {
-    const latestData = {};
-    for (const [sensorType, data] of Object.entries(sensorData)) {
-        latestData[sensorType] = data[data.length - 1] || null;
-    }
-    res.json({
-        timestamp: new Date().toISOString(),
-        storedData: latestData,
-        dataPoints: {
-            battery: sensorData.battery.length,
-            position: sensorData.position.length,
-            acceleration: sensorData.acceleration.length,
-            vibration: sensorData.vibration.length,
-            temperature: sensorData.temperature.length,
-            pressure: sensorData.pressure.length
-        }
-    });
-});
-
-// Add error handlers for the servers
+// Error handlers
 udpServer.on('error', (error) => {
     console.error('UDP Server error:', error);
     process.exit(1);

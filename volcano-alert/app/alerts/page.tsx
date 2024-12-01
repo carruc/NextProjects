@@ -1,52 +1,97 @@
-import React from "react";
-import { AlertDashboard } from "@/components/AlertDashboard";
-import { Alert } from "@/types/alert";
+'use client';
 
-const mockAlerts: Alert[] = [
-  {
-    type: "temperature",
-    value: 85,
-    unit: "°C",
-    severity: "high",
-    timestamp: new Date(),
-  },
-  {
-    type: "seismic",
-    value: 3.5,
-    unit: "magnitude",
-    severity: "medium",
-    timestamp: new Date(),
-  },
-  {
-    type: "gas",
-    value: 150,
-    unit: "ppm SO2",
-    severity: "low",
-    timestamp: new Date(),
-  },
-  {
-    type: "temperature",
-    value: 65,
-    unit: "°C",
-    severity: "medium",
-    timestamp: new Date(),
-  },
-  {
-    type: "seismic",
-    value: 5.0,
-    unit: "magnitude",
-    severity: "high",
-    timestamp: new Date(),
-  },
-  {
-    type: "gas",
-    value: 300,
-    unit: "ppm SO2",
-    severity: "medium",
-    timestamp: new Date(),
-  },
-]
+import { useCallback, useEffect, useState } from "react";
+import { AlertDashboard } from "@/components/AlertDashboard";
+import { Alert, AlertType } from "@/types/alert";
+import { calculateSeverity } from "@/utils/alertThresholds";
+import { getLatestCollectiveData } from "@/app/api/deviceApi";
+import { SensorType } from "@/types/sensors";
+import { accelerationToMercalli } from "@/lib/utils";
+
+async function fetchSensorData() {
+  try {
+    // Updated sensor types to include CO2 and SO2
+    const sensorTypes: SensorType[] = ['temperature', 'vibration', 'co2', 'so2'];
+    
+    const data = await getLatestCollectiveData(sensorTypes, 'average');
+    
+    return {
+      averageTemperature: data.temperature?.metrics.average ?? null,
+      averageSeismic: data.vibration?.metrics.average ?? null,
+      averageCO2: data.co2?.metrics.average ?? null,
+      averageSO2: data.so2?.metrics.average ?? null,
+    };
+  } catch (error) {
+    console.error('Error fetching sensor data:', error);
+    return null;
+  }
+}
+
+function processRawData(data: any): Alert[] {
+  if (!data) return [];
+
+  const alerts: Alert[] = [];
+  
+  // Process temperature data
+  if (data.averageTemperature !== null) {
+    alerts.push({
+      type: 'temperature',
+      value: Number(data.averageTemperature.toFixed(1)),
+      unit: '°C',
+      severity: calculateSeverity('temperature', data.averageTemperature),
+      timestamp: new Date(),
+    });
+  }
+
+  // Process seismic data
+  if (data.averageSeismic !== null) {
+    const mercalli = accelerationToMercalli(data.averageSeismic);
+    alerts.push({
+      type: 'seismic',
+      value: mercalli.intensity,
+      unit: 'Mercalli',
+      severity: calculateSeverity('seismic', mercalli.intensity),
+      timestamp: new Date(),
+    });
+  }
+
+  // Process CO2 data
+  if (data.averageCO2 !== null) {
+    alerts.push({
+      type: 'co2',
+      value: Number(data.averageCO2.toFixed(0)),
+      unit: 'ppm',
+      severity: calculateSeverity('co2', data.averageCO2),
+      timestamp: new Date(),
+    });
+  }
+
+  // Process SO2 data
+  if (data.averageSO2 !== null) {
+    alerts.push({
+      type: 'so2',
+      value: Number(data.averageSO2.toFixed(0)),
+      unit: 'ppm',
+      severity: calculateSeverity('so2', data.averageSO2),
+      timestamp: new Date(),
+    });
+  }
+
+  return alerts;
+}
 
 export default function AlertsPage() {
-  return <AlertDashboard alerts={[...mockAlerts]} />;
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  const refreshData = useCallback(async () => {
+    const data = await fetchSensorData();
+    const processedAlerts = processRawData(data);
+    setAlerts(processedAlerts);
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  return <AlertDashboard alerts={alerts} onRefresh={refreshData} />;
 } 

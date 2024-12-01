@@ -14,6 +14,14 @@ const severityTextColors: Record<AlertSeverity, string> = {
   high: "text-red-700",
 };
 
+// Add icons for different alert types
+const alertIcons: Record<string, string> = {
+  temperature: '🌡️',
+  seismic: '📳',
+  co2: '💨',
+  so2: '⚠️',
+};
+
 interface AlertCardProps {
   alert: Alert;
 }
@@ -22,7 +30,12 @@ export function AlertCard({ alert }: AlertCardProps) {
   return (
     <Card className={`${severityColors[alert.severity]} border-2`}>
       <CardHeader>
-        <CardTitle className="capitalize">{alert.type}</CardTitle>
+        <CardTitle className="capitalize flex items-center gap-2">
+          <span>{alertIcons[alert.type]}</span>
+          {alert.type === 'co2' ? 'CO₂' : 
+           alert.type === 'so2' ? 'SO₂' : 
+           alert.type}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">

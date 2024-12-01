@@ -21,7 +21,9 @@ const SENSOR_TYPES: { label: string; value: SensorType; color: string }[] = [
   { label: 'Vibration', value: 'vibration', color: 'rgb(168, 85, 247)' },
   { label: 'Acceleration X', value: 'acceleration_x', color: 'rgb(249, 115, 22)' },
   { label: 'Acceleration Y', value: 'acceleration_y', color: 'rgb(236, 72, 153)' },
-  { label: 'Acceleration Z', value: 'acceleration_z', color: 'rgb(234, 179, 8)' }
+  { label: 'Acceleration Z', value: 'acceleration_z', color: 'rgb(234, 179, 8)' },
+  { label: 'CO₂', value: 'co2', color: 'rgb(147, 51, 234)' },
+  { label: 'SO₂', value: 'so2', color: 'rgb(20, 184, 166)' }
 ]
 
 export function SensorControls({ sensors, timeRanges, onOptionsChange }: SensorControlsProps) {
