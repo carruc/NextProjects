@@ -45,12 +45,12 @@ function processRawData(data: any): Alert[] {
 
   // Process seismic data
   if (data.averageSeismic !== null) {
-    const mercalli = accelerationToRichter(data.averageSeismic);
+    const richter = accelerationToRichter(data.averageSeismic);
     alerts.push({
       type: 'seismic',
-      value: mercalli.intensity,
-      unit: 'Mercalli',
-      severity: calculateSeverity('seismic', mercalli.intensity),
+      value: richter.intensity,
+      unit: 'Richter',
+      severity: calculateSeverity('seismic', richter.intensity),
       timestamp: new Date(),
     });
   }

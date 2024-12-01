@@ -7,37 +7,37 @@ import threading
 UDP_IP = "127.0.0.1"
 UDP_PORT = 6000
 
-# Define device IDs and their approximate locations around Etna
+# Define device IDs and their approximate locations
 DEVICES = [
     {
         'id': 1,
-        'latitude': 37.7580,  # North (~1km from center)
-        'longitude': 14.9934,
-        'altitude': 2950
+        'latitude': 45.4847,  # North (~750m from center)
+        'longitude': 9.2320,
+        'altitude': 150
     },
     {
         'id': 2,
-        'latitude': 37.7440,  # South (~1.2km from center)
-        'longitude': 14.9934,
-        'altitude': 2850
+        'latitude': 45.4713,  # South (~750m from center)
+        'longitude': 9.2320,
+        'altitude': 150
     },
     {
         'id': 3,
-        'latitude': 37.7513,  # East (~1km from center)
-        'longitude': 15.0034,
-        'altitude': 2900
+        'latitude': 45.4780,  # East (~750m from center)
+        'longitude': 9.2420,
+        'altitude': 150
     },
     {
         'id': 4,
-        'latitude': 37.7513,  # West (~1km from center)
-        'longitude': 14.9834,
-        'altitude': 2800
+        'latitude': 45.4780,  # West (~750m from center)
+        'longitude': 9.2220,
+        'altitude': 150
     },
     {
         'id': 5,
-        'latitude': 37.7513,  # Center (summit area)
-        'longitude': 14.9934,
-        'altitude': 3050
+        'latitude': 45.4780,  # Center
+        'longitude': 9.2320,
+        'altitude': 150
     }
 ]
 
