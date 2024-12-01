@@ -130,6 +130,30 @@ export async function getMultipleSensorData(
  * Fetches device locations from the server
  */
 export async function getDeviceLocations(): Promise<DeviceStatus[]> {
-    // In a real implementation, this would fetch from the backend
-    return Promise.resolve(MOCK_DEVICES);
+    try {
+        // First get all available devices
+        const devices = await getAvailableDevices();
+        
+        // Then fetch location and battery data for each device
+        const deviceStatuses = await Promise.all(devices.map(async (deviceId) => {
+            // Get location data
+            const locationData = await getSensorData(deviceId, 'location');
+            const batteryData = await getSensorData(deviceId, 'battery');
+            
+            if (locationData.value && batteryData.value) {
+                return {
+                    deviceId: deviceId.toString(),
+                    position: locationData.value,
+                    batteryLevel: batteryData.value
+                };
+            }
+            return null;
+        }));
+
+        // Filter out null values and return valid device statuses
+        return deviceStatuses.filter((status): status is DeviceStatus => status !== null);
+    } catch (error) {
+        console.error('Failed to fetch device locations:', error);
+        return [];
+    }
 }

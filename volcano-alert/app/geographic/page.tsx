@@ -10,7 +10,7 @@ const GeographicMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[600px] w-full flex items-center justify-center bg-muted">
+      <div className="h-[800px] w-full flex items-center justify-center bg-muted">
         Loading map...
       </div>
     )

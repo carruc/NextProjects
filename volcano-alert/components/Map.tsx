@@ -12,21 +12,53 @@ const Map = () => {
   const markersRef = useRef<L.CircleMarker[]>([]);
   const [devices, setDevices] = useState<DeviceStatus[]>([]);
 
-  useEffect(() => {
-    // Initialize map only if it hasn't been initialized yet
-    if (mapContainerRef.current && !mapRef.current) {
-      console.log('Initializing map...');
-      mapRef.current = L.map(mapContainerRef.current).setView([51.505, -0.09], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-      }).addTo(mapRef.current);
+  // Calculate center point from devices
+  const calculateMapCenter = (devices: DeviceStatus[]) => {
+    if (devices.length === 0) {
+      // Default to Mount Etna's location if no devices
+      return { lat: 37.7510, lng: 14.9934, zoom: 14 };
     }
 
+    const lats = devices.map(d => d.position.latitude);
+    const lngs = devices.map(d => d.position.longitude);
+    
+    const centerLat = lats.reduce((a, b) => a + b, 0) / lats.length;
+    const centerLng = lngs.reduce((a, b) => a + b, 0) / lngs.length;
+
+    // Calculate appropriate zoom level based on device spread
+    const latSpread = Math.max(...lats) - Math.min(...lats);
+    const lngSpread = Math.max(...lngs) - Math.min(...lngs);
+    const maxSpread = Math.max(latSpread, lngSpread);
+    
+    // Adjust zoom based on spread (these values might need tuning)
+    let zoom = 14;
+    if (maxSpread > 0.01) zoom = 13;
+    if (maxSpread > 0.05) zoom = 12;
+    if (maxSpread > 0.1) zoom = 11;
+
+    return { lat: centerLat, lng: centerLng, zoom };
+  };
+
+  useEffect(() => {
     // Fetch device locations
     const fetchDevices = async () => {
       try {
         const deviceData = await getDeviceLocations();
         setDevices(deviceData);
+
+        // Initialize or update map center when devices are loaded
+        const { lat, lng, zoom } = calculateMapCenter(deviceData);
+        
+        if (!mapRef.current && mapContainerRef.current) {
+          console.log('Initializing map...');
+          mapRef.current = L.map(mapContainerRef.current).setView([lat, lng], zoom);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+          }).addTo(mapRef.current);
+        } else if (mapRef.current) {
+          // Update map view if map already exists
+          mapRef.current.setView([lat, lng], zoom);
+        }
       } catch (error) {
         console.error('Failed to fetch device locations:', error);
       }
@@ -37,7 +69,6 @@ const Map = () => {
 
     return () => {
       clearInterval(interval);
-      // Cleanup map on unmount
       if (mapRef.current) {
         console.log('Cleaning up map...');
         mapRef.current.remove();
@@ -86,7 +117,7 @@ const Map = () => {
   return (
     <div
       ref={mapContainerRef}
-      style={{ height: '600px', width: '100%' }}
+      style={{ height: '800px', width: '100%' }}
       id="leaflet-map-container"
     />
   );
