@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import Script from 'next/script'
 import Image from 'next/image'
 import { FeatureCard } from '@/components/FeatureCard'
+import './styles/feature-carousel.css'
 
 export default function LandingPage() {
   useEffect(() => {

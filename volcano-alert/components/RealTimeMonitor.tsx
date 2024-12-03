@@ -9,7 +9,7 @@ import { usePathname } from 'next/navigation'
 import { getAvailableDevices } from '@/app/api/deviceApi'
 
 export const timeRanges = [
-  { label: '30 Seconds', value: '30s', updateInterval: 100 },  // Added new option
+  { label: '30 Seconds', value: '30s', updateInterval: 100 },
   { label: '1 Minute', value: '1m', updateInterval: 100 },
   { label: '1 Hour', value: '1h', updateInterval: 10000 },
   { label: '24 Hours', value: '24h', updateInterval: 10000 },
@@ -19,7 +19,14 @@ export const timeRanges = [
 
 const RealTimeLineChart = dynamic(
   () => import('./charts/RealTimeLineChart').then((mod) => mod.RealTimeLineChart),
-  { ssr: false }
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-gray-500">
+        Loading chart...
+      </div>
+    )
+  }
 )
 
 export function RealTimeMonitor() {

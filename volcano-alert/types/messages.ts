@@ -4,19 +4,15 @@ export interface BroadcastMessage {
   includeMetrics?: string[];
 }
 
-export interface AutomatedMessageRule {
+export interface AutomatedMessageRule extends AutomatedMessageSettings {
   id: string;
   metricId: string;
-  threshold: number;
-  comparison: 'higher' | 'lower';
-  message: string;
   channels: string[];
-  enabled: boolean;
 }
 
 export interface AutomatedMessageSettings {
   enabled: boolean;
   threshold: number;
-  comparison: 'higher' | 'lower';
+  comparison: 'greater' | 'less' | 'equal';  // Changed from 'higher' | 'lower'
   message: string;
-} 
+}

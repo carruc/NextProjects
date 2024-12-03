@@ -28,6 +28,13 @@ const SENSOR_METRICS = [
 
 const API_BASE_URL = 'http://localhost:8080/api';
 
+const DEFAULT_AUTOMATED_SETTINGS: AutomatedMessageSettings = {
+  enabled: false,
+  threshold: 0,
+  comparison: 'higher',
+  message: ''
+};
+
 export function BroadcastMonitor() {
   const [message, setMessage] = useState('')
   const [selectedChannels, setSelectedChannels] = useState<string[]>([])
@@ -46,11 +53,16 @@ export function BroadcastMonitor() {
         const rules: Record<string, AutomatedMessageRule> = await response.json();
         
         const settings: Record<string, AutomatedMessageSettings> = {};
+        SENSOR_METRICS.forEach(metric => {
+          settings[metric.id] = DEFAULT_AUTOMATED_SETTINGS;
+        });
+        
         Object.values(rules).forEach(rule => {
           settings[rule.metricId] = {
             enabled: rule.enabled,
             threshold: rule.threshold,
-            comparison: rule.comparison,
+            comparison: rule.comparison === 'greater' ? 'higher' : 
+                       rule.comparison === 'less' ? 'lower' : 'higher',
             message: rule.message
           };
         });
@@ -63,6 +75,11 @@ export function BroadcastMonitor() {
         }
       } catch (error) {
         console.error('Failed to fetch automated rules:', error);
+        const defaultSettings: Record<string, AutomatedMessageSettings> = {};
+        SENSOR_METRICS.forEach(metric => {
+          defaultSettings[metric.id] = DEFAULT_AUTOMATED_SETTINGS;
+        });
+        setAutomatedSettings(defaultSettings);
       }
     };
 
@@ -126,6 +143,10 @@ export function BroadcastMonitor() {
     }
   }
 
+  const isChannelSelected = (channelId: string) => {
+    return selectedChannels?.includes(channelId) ?? false;
+  }
+
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col gap-4 p-4">
       <Card className="p-6">
@@ -180,7 +201,7 @@ export function BroadcastMonitor() {
             </label>
             <div className="flex flex-wrap gap-2">
               {CHANNELS.map((channel) => {
-                const isSelected = selectedChannels.includes(channel.id)
+                const isSelected = isChannelSelected(channel.id);
                 
                 return (
                   <button
@@ -237,7 +258,7 @@ export function BroadcastMonitor() {
               metricId={metric.id}
               metricName={metric.name}
               unit={metric.unit}
-              initialSettings={automatedSettings[metric.id]}
+              initialSettings={automatedSettings[metric.id] || DEFAULT_AUTOMATED_SETTINGS}
               onUpdate={(settings) => handleAutomatedMessageUpdate(metric.id, settings)}
             />
           ))}

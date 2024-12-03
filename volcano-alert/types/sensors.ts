@@ -1,14 +1,14 @@
 export type SensorType = 
-  | 'battery' 
-  | 'acceleration_x' 
-  | 'acceleration_y' 
-  | 'acceleration_z' 
-  | 'vibration' 
-  | 'temperature' 
+  | 'temperature'
   | 'pressure'
-  | 'location'
+  | 'battery'
+  | 'vibration'
+  | 'acceleration_x'
+  | 'acceleration_y'
+  | 'acceleration_z'
   | 'co2'
   | 'so2'
+  | 'location'
   | 'tagClass';
 
 export type AggregationType = 'average' | 'peak' | 'rms';

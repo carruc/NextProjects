@@ -1,36 +1,39 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  TimeScale,
-  ChartOptions,
-  ChartData          // Added import
-} from 'chart.js'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import type { ChartData, ChartOptions } from 'chart.js'
+import dynamic from 'next/dynamic'
 import 'chartjs-adapter-date-fns'
 import { format } from 'date-fns'
 import { timeRanges } from '../RealTimeMonitor'
 import { SensorType, AggregationType } from '@/types/sensors'
 import { getLatestCollectiveData, getMultipleSensorData } from '@/app/api/deviceApi'
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  TimeScale,
-  Title,
-  Tooltip,
-  Legend
-)
+// Dynamically import react-chartjs-2
+const Line = dynamic(
+  () => import('react-chartjs-2').then((mod) => mod.Line),
+  { ssr: false }
+);
+
+let Chart: typeof import('chart.js').Chart;
+
+const initChart = async () => {
+  if (typeof window !== 'undefined') {
+    const chartjs = await import('chart.js');
+    Chart = chartjs.Chart;
+    
+    Chart.register(
+      chartjs.CategoryScale,
+      chartjs.LinearScale,
+      chartjs.PointElement,
+      chartjs.LineElement,
+      chartjs.TimeScale,
+      chartjs.Title,
+      chartjs.Tooltip,
+      chartjs.Legend
+    );
+  }
+};
 
 interface DataPoint {
   x: Date;
@@ -66,7 +69,8 @@ const TYPE_COLORS: Record<SensorType, string> = {
   acceleration_z: 'rgb(234, 179, 8)',
   co2: 'rgb(147, 51, 234)',
   so2: 'rgb(20, 184, 166)',
-  location: 'rgb(0, 0, 0)'
+  location: 'rgb(0, 0, 0)',
+  tagClass: 'rgb(100, 100, 100)'
 }
 
 const UNITS: Record<SensorType, string> = {
@@ -79,7 +83,8 @@ const UNITS: Record<SensorType, string> = {
   acceleration_z: 'g',
   co2: 'ppm',
   so2: 'ppm',
-  location: 'a'
+  location: 'a',
+  tagClass: 'tag'
 }
 
 export function RealTimeLineChart({
@@ -89,6 +94,7 @@ export function RealTimeLineChart({
   selectedTypes,
   dataType
 }: RealTimeLineChartProps) {
+  const [isChartReady, setIsChartReady] = useState(false);
   const [dataPoints, setDataPoints] = useState<Record<SensorType, DataPoint[]>>({
     temperature: [],
     pressure: [],
@@ -99,137 +105,117 @@ export function RealTimeLineChart({
     acceleration_z: [],
     co2: [],
     so2: [],
-    location: []
-  })
+    location: [],
+    tagClass: []
+  });
   
-  const chartRef = useRef<ChartJS<"line", DataPoint[], unknown>>(null)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const chartRef = useRef<any>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-
-  const getTimeWindow = () => {
+  const getTimeWindow = useCallback(() => {
     switch (timeRange) {
-      case '30s':
-        return 30 * 1000    // Added new case
-      case '1m':
-        return 60 * 1000
-      case '1h':
-        return 60 * 60 * 1000
-      case '24h':
-        return 24 * 60 * 60 * 1000
-      case '7d':
-        return 7 * 24 * 60 * 60 * 1000
-      case '30d':
-        return 30 * 24 * 60 * 60 * 1000
-      default:
-        return 60 * 60 * 1000
+      case '30s': return 30 * 1000;
+      case '1m': return 60 * 1000;
+      case '1h': return 60 * 60 * 1000;
+      case '24h': return 24 * 60 * 60 * 1000;
+      case '7d': return 7 * 24 * 60 * 60 * 1000;
+      case '30d': return 30 * 24 * 60 * 60 * 1000;
+      default: return 60 * 60 * 1000;
     }
-  }
+  }, [timeRange]);
 
-  const getDynamicRange = (data: Array<{x: Date, y: number}>) => {
-    if (!data || data.length === 0) return { min: 0, max: 1 }
+  const getDynamicRange = useCallback((data: Array<{x: Date, y: number}>) => {
+    if (!data || data.length === 0) return { min: 0, max: 1 };
     
-    const values = data.map(point => point.y)
-    const min = Math.min(...values)
-    const max = Math.max(...values)
+    const values = data.map(point => point.y);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
     
     if (min === max) {
-      return {
-        min: min - 0.5,
-        max: max + 0.5
-      }
+      return { min: min - 0.5, max: max + 0.5 };
     }
     
-    const range = max - min
-    const padding = range * 0.1
+    const range = max - min;
+    const padding = range * 0.1;
     
-    return {
-      min: min - padding,
-      max: max + padding
-    }
-  }
+    return { min: min - padding, max: max + padding };
+  }, []);
 
-  const updateDataPoints = (type: SensorType, value: number | null | undefined) => {
-    if (value === null || value === undefined) return
+  const updateDataPoints = useCallback((type: SensorType, value: number | null | undefined) => {
+    if (value === null || value === undefined) return;
 
     setDataPoints(prevData => {
-      const timestamp = new Date()
-      const updatedData = [...prevData[type], { x: timestamp, y: value }]
+      const timestamp = new Date();
+      const updatedData = [...prevData[type], { x: timestamp, y: value }];
       return {
         ...prevData,
         [type]: updatedData.slice(-MAX_DATA_POINTS)
-      }
-    })
-  }
+      };
+    });
+  }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       if (selectedSensor === 'all') {
-        const data = await getLatestCollectiveData(selectedTypes, aggregationType)
+        const data = await getLatestCollectiveData(selectedTypes, aggregationType);
         selectedTypes.forEach(type => {
-          const value = data[type]?.metrics?.[aggregationType]
-          updateDataPoints(type, value)
-        })
+          const value = data[type]?.metrics?.[aggregationType];
+          updateDataPoints(type, value);
+        });
       } else {
-        const data = await getMultipleSensorData(selectedSensor, selectedTypes)
+        const data = await getMultipleSensorData(selectedSensor, selectedTypes);
         selectedTypes.forEach(type => {
-          updateDataPoints(type, data[type])
-        })
+          updateDataPoints(type, data[type]);
+        });
       }
     } catch (error) {
-      console.error('Error fetching sensor data:', error)
+      console.error('Error fetching sensor data:', error);
     }
-  }
+  }, [selectedSensor, selectedTypes, aggregationType, updateDataPoints]);
 
+  // Initialize Chart.js
+  useEffect(() => {
+    initChart().then(() => setIsChartReady(true));
+  }, []);
+
+  // Set up data polling
   useEffect(() => {
     if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
+      clearInterval(pollingIntervalRef.current);
     }
 
-    setDataPoints({
-      temperature: [],
-      pressure: [],
-      battery: [],
-      vibration: [],
-      acceleration_x: [],
-      acceleration_y: [],
-      acceleration_z: [],
-      co2: [],
-      so2: [],
-      location: []
-    })
+    void fetchData();
 
-    fetchData()
-
-    const interval = UPDATE_INTERVALS[timeRange as keyof typeof UPDATE_INTERVALS] || 10000
-    pollingIntervalRef.current = setInterval(fetchData, interval)
+    const interval = UPDATE_INTERVALS[timeRange as keyof typeof UPDATE_INTERVALS] || 10000;
+    pollingIntervalRef.current = setInterval(fetchData, interval);
 
     return () => {
       if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
+        clearInterval(pollingIntervalRef.current);
       }
-    }
-  }, [timeRange, selectedTypes, selectedSensor, aggregationType])
+    };
+  }, [timeRange, selectedTypes, selectedSensor, aggregationType, fetchData]);
 
-  // Update time window continuously
+  // Update time window
   useEffect(() => {
+    const timeWindow = getTimeWindow();
+    
     const updateTimeWindow = () => {
-      const chart = chartRef.current
+      const chart = chartRef.current;
       if (!chart?.options?.scales?.['x']) return;
 
-      const xAxis = chart.options.scales['x']
-      const now = Date.now()
-      const timeWindow = getTimeWindow()
+      const xAxis = chart.options.scales['x'];
+      const now = Date.now();
       
-      // Type assertion since we know these are valid properties
-      xAxis.min = now - timeWindow as unknown as number
-      xAxis.max = now as unknown as number
+      xAxis.min = now - timeWindow;
+      xAxis.max = now;
       
-      chart.update('none')
-    }
+      chart.update('none');
+    };
 
-    const intervalId = setInterval(updateTimeWindow, 1000)
-    return () => clearInterval(intervalId)
-  }, [timeRange])
+    const intervalId = setInterval(updateTimeWindow, 1000);
+    return () => clearInterval(intervalId);
+  }, [timeRange, getTimeWindow]);
 
   const chartOptions: ChartOptions<'line'> = {
     responsive: true,
@@ -259,7 +245,7 @@ export function RealTimeLineChart({
         max: Date.now()
       },
       ...selectedTypes.reduce((acc, type, index) => {
-        const range = getDynamicRange(dataPoints[type])
+        const range = getDynamicRange(dataPoints[type]);
         return {
           ...acc,
           [`y-${type}`]: {
@@ -282,7 +268,7 @@ export function RealTimeLineChart({
             max: range.max,
             beginAtZero: type === 'battery'
           }
-        }
+        };
       }, {})
     },
     plugins: {
@@ -291,19 +277,19 @@ export function RealTimeLineChart({
         intersect: false,
         callbacks: {
           title: (tooltipItems) => {
-            const date = new Date(tooltipItems[0].parsed.x)
-            return format(date, timeRange === '1m' ? 'HH:mm:ss.SSS' : 'HH:mm:ss')
+            const date = new Date(tooltipItems[0].parsed.x);
+            return format(date, timeRange === '1m' ? 'HH:mm:ss.SSS' : 'HH:mm:ss');
           },
           label: (context) => {
-            if (!context.dataset.label) return ''
-            const value = context.parsed.y.toFixed(3)
-            const sensorType = context.dataset.label.toLowerCase().replace(' ', '_') as SensorType
-            return `${context.dataset.label}: ${value} ${UNITS[sensorType]}`
+            if (!context.dataset.label) return '';
+            const value = context.parsed.y.toFixed(3);
+            const sensorType = context.dataset.label.toLowerCase().replace(' ', '_') as SensorType;
+            return `${context.dataset.label}: ${value} ${UNITS[sensorType]}`;
           }
         }
       },
       legend: {
-        position: 'top',
+        position: 'top' as const,
         labels: {
           usePointStyle: true,
           pointStyle: 'circle'
@@ -314,9 +300,9 @@ export function RealTimeLineChart({
       intersect: false,
       mode: 'nearest'
     }
-  }
+  };
 
-  const chartData = {
+  const chartData: ChartData<'line', DataPoint[]> = {
     datasets: selectedTypes.map(type => ({
       label: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' '),
       data: dataPoints[type],
@@ -326,11 +312,15 @@ export function RealTimeLineChart({
       pointRadius: 0,
       yAxisID: `y-${type}`
     }))
-  } as ChartData<'line', DataPoint[]>
+  };
+
+  if (!isChartReady) {
+    return <div className="flex h-full items-center justify-center text-gray-500">Loading chart...</div>;
+  }
 
   return (
     <div className="relative w-full h-full">
       <Line ref={chartRef} options={chartOptions} data={chartData} />
     </div>
-  )
+  );
 }
